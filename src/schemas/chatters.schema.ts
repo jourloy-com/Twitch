@@ -12,6 +12,9 @@ export class Chatters {
 
 	@Prop()
 	seconds: number;
+
+	@Prop()
+	messages: number;
 }
 
 export const ChattersSchema = SchemaFactory.createForClass(Chatters);

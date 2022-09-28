@@ -1,17 +1,19 @@
-import {Injectable, Logger} from '@nestjs/common';
+import {Inject, Injectable, Logger} from '@nestjs/common';
 import * as tmi from "tmi.js";
 import {TwitchAPI} from "./modules/api";
 import {Model} from "mongoose";
 import {Chatters, ChattersDocument} from "../schemas/chatters.schema";
 import {InjectModel} from "@nestjs/mongoose";
 import {Cron} from "@nestjs/schedule";
-import {client} from "tmi.js";
+import {ClientProxy} from "@nestjs/microservices";
+import {lastValueFrom} from "rxjs";
 
 @Injectable()
 export class AppService {
 
 	constructor(
 		@InjectModel(Chatters.name) private userModel: Model<ChattersDocument>,
+		@Inject(`DISCORD_SERVICE`) private discordRMQ: ClientProxy,
 	) {
 		const options = {
 			options: {debug: false},
@@ -92,6 +94,14 @@ export class AppService {
 		return this.userModel.findOne({username: username}).exec();
 	}
 
+	private async addMessage(username: string) {
+		const user = await this.getUser(username);
+		if (!user) return;
+		if (user.messages) user.messages++;
+		else user.messages = 1;
+		user.save();
+	}
+
 	private async run() {
 		this.client.on(`message`, async (channel, userstate, message, self) => {
 			if (self) return;
@@ -101,11 +111,14 @@ export class AppService {
 			const msSplit = messageSplit[0].split(`!`);
 			const command = msSplit[1];
 
+			await this.addMessage(username);
+
 			if (command === `followerage`) {
 				const user = await this.getUser(username);
 				if (!user) await this.client.say(channel, `@${username}, ничего не нашел`);
 				else await this.client.say(channel, `@${username}, ${this.toHHMMSS(user.seconds)}`);
 			}
+
 		});
 
 		this.client.on(`ban`, async (channel, username, reason) => {

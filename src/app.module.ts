@@ -6,6 +6,7 @@ import {ScheduleModule} from "@nestjs/schedule";
 import {ConfigModule, ConfigService} from "@nestjs/config";
 import {Config, ConfigSchema} from "./schemas/config.schema";
 import {Chatters, ChattersSchema} from "./schemas/chatters.schema";
+import {ClientsModule, Transport} from "@nestjs/microservices";
 
 @Module({
 	imports: [
@@ -21,7 +22,20 @@ import {Chatters, ChattersSchema} from "./schemas/chatters.schema";
 		MongooseModule.forFeature([
 			{name: Config.name, schema: ConfigSchema},
 			{name: Chatters.name, schema: ChattersSchema}
-		])
+		]),
+		ClientsModule.register([
+			{
+				name: `DISCORD_SERVICE`,
+				transport: Transport.RMQ,
+				options: {
+					urls: [`amqp://${process.env.RMQ_HOST}:${process.env.RMQ_PORT}`],
+					queue: `jourloy_discord`,
+					queueOptions: {
+						durable: false
+					},
+				},
+			},
+		]),
 	],
 	controllers: [AppController],
 	providers: [AppService],
