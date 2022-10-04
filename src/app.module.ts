@@ -8,6 +8,7 @@ import {Config, ConfigSchema} from "./schemas/config.schema";
 import {Chatters, ChattersSchema} from "./schemas/chatters.schema";
 import {ClientsModule, Transport} from "@nestjs/microservices";
 import { UptimeChannels, UptimeChannelsSchema } from './schemas/uptimeChannels.schema';
+import {Streams, StreamsSchema} from "./schemas/streams.schema";
 
 @Module({
 	imports: [
@@ -24,6 +25,7 @@ import { UptimeChannels, UptimeChannelsSchema } from './schemas/uptimeChannels.s
 			{name: Config.name, schema: ConfigSchema},
 			{name: Chatters.name, schema: ChattersSchema},
 			{name: UptimeChannels.name, schema: UptimeChannelsSchema},
+			{name: Streams.name, schema: StreamsSchema},
 		]),
 		ClientsModule.register([
 			{
