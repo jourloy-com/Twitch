@@ -66,7 +66,7 @@ export interface Stream {
 	type: string;
 	title: string;
 	viewer_count: string;
-	started_at: Date;
+	started_at: string;
 	language: string;
 	thumbnail_url: string;
 	tag_ids: string[];

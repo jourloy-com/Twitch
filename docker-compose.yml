@@ -1,0 +1,19 @@
+version: '3.7'
+
+services:
+    app:
+        container_name: JOURLOY_COM_TWITCH
+        build:
+            context: .
+        volumes:
+            - .:/app
+            - /app/node_modules
+        command: npm run start:dev
+        env_file:
+            - .env
+networks:
+    back:
+volumes:
+    app:
+    pgdata:
+    redis-data:
