@@ -7,12 +7,14 @@ import {InjectModel} from "@nestjs/mongoose";
 import {Cron} from "@nestjs/schedule";
 import {ClientProxy} from "@nestjs/microservices";
 import {UptimeChannels, UptimeChannelsDocument} from "src/schemas/uptimeChannels.schema";
-import { lastValueFrom } from "rxjs";
+import {lastValueFrom} from "rxjs";
+import {Streams, StreamsDocument} from "../schemas/streams.schema";
 
 @Injectable()
 export class AppService {
 	constructor(
 		@InjectModel(Chatters.name) private userModel: Model<ChattersDocument>,
+		@InjectModel(Streams.name) private streamsModel: Model<StreamsDocument>,
 		@InjectModel(UptimeChannels.name)
 		private uptimeChannelsModel: Model<UptimeChannelsDocument>,
 		@Inject(`DISCORD_SERVICE`) private discordRMQ: ClientProxy
@@ -42,6 +44,8 @@ export class AppService {
 	private channels = [`#jourloy`];
 	private client: tmi.Client;
 	private api = new TwitchAPI(this.env.TWITCH_KEY);
+	private startedAt: Date | null;
+	private finishCheck: Date | null;
 
 	/**
 	 * It takes a number of seconds and returns a string in the format of HH:MM:SS
@@ -111,10 +115,24 @@ export class AppService {
 	@Cron(`*/1 * * * * *`)
 	private async checkUptimeUsers() {
 		const streamInfo = (await this.api.getInformationAboutStream([`jourloy`]))[0];
-		if (!streamInfo || !streamInfo.started_at) return;
+		if (!streamInfo || !streamInfo.started_at) {
+			if (!this.finishCheck && this.startedAt) this.finishCheck = new Date();
+			else if (this.finishCheck && this.startedAt && Date.now() - this.finishCheck.getTime() > 1000 * 60 * 10) {
+				await this.finishStream(await this.getOrCreateCurrentStream());
+			}
+			return;
+		}
+
+		if (!this.startedAt) this.startedAt = new Date();
 
 		const data = await this.api.getCurrentChatters(`jourloy`);
 		for (const user of data.chatters.viewers) {
+
+			const stream = await this.getOrCreateCurrentStream();
+			if (!stream.uptime[user]) stream.uptime[user] = 1;
+			else stream.uptime[user]++;
+			await stream.update();
+
 			const u = await this.userModel.findOne({username: user}).exec();
 			if (u) {
 				u.seconds++;
@@ -126,6 +144,40 @@ export class AppService {
 				}).save();
 			}
 		}
+	}
+
+	/**
+	 * It gets the current stream, or creates it if it doesn't exist
+	 * @returns The current stream.
+	 */
+	private async getOrCreateCurrentStream(): Promise<StreamsDocument> {
+		const date = new Date();
+
+		let stream;
+		let s = await this.streamsModel.find({startedAt: {$lt: date}, endedAt: null}).exec();
+		s = s.sort((a, b) => (a.startedAt.getTime() - b.startedAt.getTime()));
+		for (const _s of s) if (date.getTime() - _s.startedAt.getTime() <= 1000 * 60 * 60 * 24) stream = _s;
+
+		if (!stream) {
+			stream = await new this.streamsModel({
+				messages: [],
+				rewards: [],
+				uptime: [],
+				startedAt: date,
+			}).save();
+		}
+
+		return stream;
+	}
+
+	/**
+	 * It sends a message to the `stream-result` queue, and then waits for a response
+	 * @param {StreamsDocument} stream - The stream document that was created when the stream started.
+	 */
+	private async finishStream(stream: StreamsDocument) {
+		this.startedAt = null;
+		this.finishCheck = null;
+		await lastValueFrom(this.discordRMQ.send(`stream-result`, stream));
 	}
 
 	/**
@@ -158,8 +210,20 @@ export class AppService {
 			const messageSplit = message.split(` `);
 			const msSplit = messageSplit[0].split(`!`);
 			const command = msSplit[1];
+			const mod = userstate.mod || username === `jourloy`;
+			const sub = userstate.subscriber;
+			const reward = userstate[`custom-reward-id`] != null;
+			const stream = await this.getOrCreateCurrentStream();
 
 			await this.addMessage(username);
+
+			if (!stream.messages[username]) stream.messages[username] = 1;
+			else stream.messages[username]++;
+			await stream.update();
+
+			if (!reward && !mod && !sub && (message.includes(`http://`) || message.includes(`https://`))) {
+				await this.client.deletemessage(channel, userstate.id);
+			}
 
 			if (command === `followerage`) {
 				const user = await this.getUser(username);

@@ -1,17 +1,35 @@
-name: Deploy to server
+name: Deploy to prod server
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
 
 jobs:
-    build:
-        name: Build
-        runs-on: ubuntu-latest
-        steps:
-            - name: Checkout
-              uses: actions/checkout@v2.4.0
-            - name: Pull
-              uses: garygrossgarten/github-action-ssh@v0.6.3
-              with:
-                  host: ${{ secrets.HOST }}
-                  username: ${{ secrets.USERNAME }}
-                  port: ${{ secrets.PORT }}
-                  password: ${{ secrets.PASSWORD }}
-                  command: cd ${{ secrets.FOLDER }} && git pull
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2.4.0
+      - name: Pull and run
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          port: ${{ secrets.PORT }}
+          password: ${{ secrets.PASSWORD }}
+          script_stop: true
+          script: |
+            cd ${{ secrets.FOLDER }}
+            git pull
+            > .env
+            echo TWITCH_KEY=${{ secrets.TWITCH_KEY }} >> .env
+            echo TWITCH_REFRESH=${{ secrets.TWITCH_REFRESH }} >> .env
+            echo TWITCH_CLIENT_ID=${{ secrets.TWITCH_CLIENT_ID }} >> .env
+            echo MONGO_HOST=${{ secrets.MONGO_HOST }} >> .env
+            echo RMQ_HOST=${{ secrets.RMQ_HOST }} >> .env
+            echo RMQ_PORT=${{ secrets.RMQ_PORT }} >> .env
+            docker-compose down
+            docker-compose up -d

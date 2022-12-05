@@ -4,8 +4,3 @@ export interface UptimeChannel {
 	notified: boolean;
 	notifiedAt?: Date;
 }
-
-export interface UptimeUsers {
-	username: string;
-	seconds: number;
-}
