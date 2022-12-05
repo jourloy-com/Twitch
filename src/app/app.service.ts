@@ -237,16 +237,6 @@ export class AppService {
 			}
 		});
 
-		this.client.on(`redeem`, async (channel, username, rewardType, tags) => {
-			const stream = await this.getOrCreateCurrentStream();
-
-			if (!stream.rewards[username] || !stream.rewards[username][rewardType]) {
-				stream.rewards[username][rewardType] = 1;
-			} else stream.rewards[username][rewardType]++;
-
-			await stream.update();
-		});
-
 		this.client.on(`ban`, async (channel, username, reason) => {
 			if (!channel.includes(`jourloy`)) return;
 			await this.userModel.findOneAndDelete({username});
