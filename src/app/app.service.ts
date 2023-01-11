@@ -234,6 +234,11 @@ export class AppService {
 						channel,
 						`@${username}, ${this.toHHMMSS(user.seconds)}`
 					);
+			} else if (command === `клавиатура`) {
+				await this.client.say(
+					channel,
+					`@${username}, хочешь себе крутую клаву? Открывай https://jourloy.com!`
+				);
 			}
 		});
 
